@@ -22,13 +22,15 @@ package com.uber.jenkins.phabricator.tasks;
 
 import com.uber.jenkins.phabricator.LauncherFactory;
 import com.uber.jenkins.phabricator.conduit.ArcanistClient;
+import com.uber.jenkins.phabricator.utils.CommonUtils;
 import com.uber.jenkins.phabricator.utils.Logger;
+import hudson.FilePath;
+import hudson.FilePath.FileCallable;
+import hudson.remoting.VirtualChannel;
+import org.jenkinsci.remoting.RoleChecker;
 
-import java.io.IOException;
-import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.io.*;
+import java.util.*;
 
 public class ApplyPatchTask extends Task {
     private final LauncherFactory starter;
@@ -43,12 +45,17 @@ public class ApplyPatchTask extends Task {
     private final boolean createBranch;
     private final boolean patchWithForceFlag;
     private final String scmType;
+    private final String revisionType;
+    private final String rawDiff;
+    private final Logger logger;
+    private final int buildNumber;
+    private final String svnPath;
 
     public ApplyPatchTask(Logger logger, LauncherFactory starter, String baseCommit,
                           String diffID, String conduitToken, String arcPath,
-                          String gitPath, boolean createCommit, boolean skipForcedClean,
+                          String gitPath, String svnPath, boolean createCommit, boolean skipForcedClean,
                           boolean createBranch, boolean patchWithForceFlag,
-                          String scmType) {
+                          String scmType, String revisionType, String rawDiff, int buildNumber) {
         super(logger);
         this.starter = starter;
         this.baseCommit = baseCommit;
@@ -56,48 +63,45 @@ public class ApplyPatchTask extends Task {
         this.conduitToken = conduitToken;
         this.arcPath = arcPath;
         this.gitPath = gitPath;
+        this.svnPath = svnPath;
         this.createCommit = createCommit;
         this.skipForcedClean = skipForcedClean;
         this.createBranch = createBranch;
         this.patchWithForceFlag = patchWithForceFlag;
         this.scmType = scmType;
-
+        this.revisionType = revisionType;
+        this.rawDiff = rawDiff;
         this.logStream = logger.getStream();
+        this.logger = logger;
+        this.buildNumber = buildNumber;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     protected String getTag() {
-        return "arc-patch";
+        if ("diffusion".equals(revisionType)) {
+            return "arc-patch";
+        }
+        return "non-arc";
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     protected void setup() {
         // Do nothing
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     protected void execute() {
         try {
             int exitCode;
-            if (this.scmType.equals("git")) {
+            if ("git".equals(this.scmType)) {
                 exitCode = starter.launch()
-                        .cmds(Arrays.asList(gitPath, "reset", "--hard", baseCommit))
-                        .stdout(logStream)
-                        .join();
+                    .cmds(Arrays.asList(gitPath, "reset", "--hard", baseCommit))
+                    .stdout(logStream)
+                    .join();
 
                 if (exitCode != 0) {
                     info("Got non-zero exit code resetting to base commit " + baseCommit + ": " + exitCode);
                 }
-
                 if (!skipForcedClean) {
                     // Clean workspace, otherwise `arc patch` may fail
                     starter.launch()
@@ -105,37 +109,17 @@ public class ApplyPatchTask extends Task {
                         .cmds(Arrays.asList(gitPath, "clean", "-fd", "-f"))
                         .join();
                 }
-
                 // Update submodules recursively.
                 starter.launch()
-                        .stdout(logStream)
-                        .cmds(Arrays.asList(gitPath, "submodule", "update", "--init", "--recursive"))
-                        .join();
+                    .stdout(logStream)
+                    .cmds(Arrays.asList(gitPath, "submodule", "update", "--init", "--recursive"))
+                    .join();
             }
-
-            List<String> arcPatchParams = new ArrayList<String>(Arrays.asList("--diff", diffID));
-
-            if (this.scmType.equals("git")) {
-                if (!createCommit) {
-                    arcPatchParams.add("--nocommit");
-                }
-
-                if (!createBranch) {
-                    arcPatchParams.add("--nobranch");
-                }
+            if ("diffusion".equals(revisionType)) {
+                exitCode = execWithArc();
+            } else {
+                exitCode = execWithNonArc();
             }
-
-            if (patchWithForceFlag) {
-                arcPatchParams.add("--force");
-            }
-
-            ArcanistClient arc = new ArcanistClient(
-                    arcPath,
-                    "patch",
-                    conduitToken,
-                    arcPatchParams.toArray(new String[arcPatchParams.size()]));
-
-            exitCode = arc.callConduit(starter.launch(), logStream);
             this.result = exitCode == 0 ? Result.SUCCESS : Result.FAILURE;
         } catch (IOException e) {
             e.printStackTrace(logStream);
@@ -152,5 +136,47 @@ public class ApplyPatchTask extends Task {
     @Override
     protected void tearDown() {
         // Do nothing
+    }
+
+    private int execWithArc() throws IOException, InterruptedException {
+        List<String> arcPatchParams = new ArrayList<String>(Arrays.asList("--diff", diffID));
+        if (this.scmType.equals("git")) {
+            if (!createCommit) {
+                arcPatchParams.add("--nocommit");
+            }
+            if (!createBranch) {
+                arcPatchParams.add("--nobranch");
+            }
+        }
+        if (patchWithForceFlag) {
+            arcPatchParams.add("--force");
+        }
+        ArcanistClient arc = new ArcanistClient(
+            arcPath,
+            "patch",
+            conduitToken,
+            arcPatchParams.toArray(new String[arcPatchParams.size()]));
+        return arc.callConduit(starter.launch(), logStream);
+    }
+
+    private int execWithNonArc() throws IOException, InterruptedException {
+        int exitCode = 0;
+        File masterTmpFile = CommonUtils.createTempFile(String.valueOf(buildNumber) + "-" + UUID.randomUUID().toString() + ".diff", rawDiff);
+        String tmpFilePathAbsolutePath = masterTmpFile.getAbsolutePath();
+        logger.info(getTag(), tmpFilePathAbsolutePath);
+        FilePath salveTmpFile = new FilePath(starter.getChannel(), tmpFilePathAbsolutePath);
+        salveTmpFile.write(rawDiff, "UTF-8");
+        if ("git".equals(scmType)) {
+            exitCode = starter.launch()
+                .cmds(Arrays.asList(svnPath, "apply", tmpFilePathAbsolutePath))
+                .join();
+        } else {
+            exitCode = starter.launch()
+                .cmds(Arrays.asList(svnPath, "patch", tmpFilePathAbsolutePath))
+                .join();
+        }
+        masterTmpFile.delete();
+        salveTmpFile.delete();
+        return exitCode;
     }
 }

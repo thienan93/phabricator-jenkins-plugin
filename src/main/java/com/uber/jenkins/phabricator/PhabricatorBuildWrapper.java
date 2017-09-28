@@ -70,11 +70,12 @@ public class PhabricatorBuildWrapper extends BuildWrapper {
     private final boolean patchWithForceFlag;
     private String workDir;
     private String scmType;
+    private String revisionType;
 
     @DataBoundConstructor
     public PhabricatorBuildWrapper(boolean createCommit, boolean applyToMaster,
-                                   boolean skipForcedClean,
-                                   boolean createBranch, boolean patchWithForceFlag) {
+                                   boolean skipForcedClean, boolean createBranch,
+                                   boolean patchWithForceFlag, String revisionType) {
         this.createCommit = createCommit;
         this.applyToMaster = applyToMaster;
         this.skipForcedClean = skipForcedClean;
@@ -82,6 +83,7 @@ public class PhabricatorBuildWrapper extends BuildWrapper {
         this.patchWithForceFlag = patchWithForceFlag;
         this.workDir = null;
         this.scmType = "git";
+        this.revisionType = revisionType;
     }
 
     @DataBoundSetter
@@ -94,7 +96,6 @@ public class PhabricatorBuildWrapper extends BuildWrapper {
         this.scmType = scmType;
     }
 
-    /** {@inheritDoc} */
     @Override
     public Environment setUp(AbstractBuild build,
                              Launcher launcher,
@@ -145,6 +146,7 @@ public class PhabricatorBuildWrapper extends BuildWrapper {
         }
 
         Differential diff;
+        final String rawDiff;
         try {
             diff = new Differential(diffClient.fetchDiff());
             diff.setCommitMessage(diffClient.getCommitMessage(diff.getRevisionID(false)));
@@ -156,6 +158,8 @@ public class PhabricatorBuildWrapper extends BuildWrapper {
             envAdditions.put(DIFFERENTIAL_BASE_COMMIT, diff.getBaseCommit());
             envAdditions.put(DIFFERENTIAL_BRANCH, diff.getBranch());
             envAdditions.put(DIFFERENTIAL_SUMMARY, diff.getCommitMessage());
+
+            rawDiff = diffClient.getRawDiff(diffID);
         } catch (ConduitAPIException e) {
             e.printStackTrace(logger.getStream());
             logger.warn(CONDUIT_TAG, "Unable to fetch differential from Conduit API");
@@ -167,12 +171,11 @@ public class PhabricatorBuildWrapper extends BuildWrapper {
         if (!applyToMaster) {
             baseCommit = diff.getBaseCommit();
         }
-
         final String conduitToken = this.getConduitToken(build.getParent(), logger);
         Task.Result result = new ApplyPatchTask(
                 logger, starter, baseCommit, diffID, conduitToken, getArcPath(),
-                DEFAULT_GIT_PATH, createCommit, skipForcedClean, createBranch,
-                patchWithForceFlag, scmType
+                getGitPath(), getSvnPath(), createCommit, skipForcedClean, createBranch,
+                patchWithForceFlag, scmType, revisionType, rawDiff, build.getNumber()
         ).run();
 
         if (result != Task.Result.SUCCESS) {
@@ -290,7 +293,11 @@ public class PhabricatorBuildWrapper extends BuildWrapper {
         return scmType;
     }
 
-    private String getPhabricatorURL(Job owner) {
+  public String getRevisionType() {
+    return revisionType;
+  }
+
+  private String getPhabricatorURL(Job owner) {
         ConduitCredentials credentials = getConduitCredentials(owner);
         if (credentials != null) {
             return credentials.getUrl();
@@ -315,6 +322,22 @@ public class PhabricatorBuildWrapper extends BuildWrapper {
         final String providedPath = getDescriptor().getArcPath();
         if (CommonUtils.isBlank(providedPath)) {
             return "arc";
+        }
+        return providedPath;
+    }
+
+    private String getGitPath() {
+        final String providedPath = getDescriptor().getGitPath();
+        if (CommonUtils.isBlank(providedPath)) {
+            return "git";
+        }
+        return providedPath;
+    }
+
+    private String getSvnPath() {
+        final String providedPath = getDescriptor().getSvnPath();
+        if (CommonUtils.isBlank(providedPath)) {
+            return "svn";
         }
         return providedPath;
     }

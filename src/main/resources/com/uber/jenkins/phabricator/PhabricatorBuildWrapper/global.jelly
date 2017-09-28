@@ -26,6 +26,14 @@
                description="location of `arc` binary, if not in path">
         <f:textbox default="arc" />
       </f:entry>
+      <f:entry title="Location of git" field="gitPath"
+               description="location of `git` binary, if not in path">
+        <f:textbox default="git" />
+      </f:entry>
+      <f:entry title="Location of svn" field="svnPath"
+               description="location of `svn` binary, if not in path">
+        <f:textbox default="svn" />
+      </f:entry>
     </f:optionalBlock>
   </f:section>
 </j:jelly>

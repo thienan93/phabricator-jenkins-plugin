@@ -63,4 +63,8 @@ public class Logger {
     public void warn(String tag, String message) {
         info(tag, message);
     }
+
+  public void debug(String tag, String message) {
+    //TODO need to be implemented
+  }
 }

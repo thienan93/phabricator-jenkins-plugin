@@ -20,8 +20,25 @@
 
 package com.uber.jenkins.phabricator.utils;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+
 public class CommonUtils {
     public static boolean isBlank(String str) {
         return str == null || str.trim().isEmpty();
+    }
+
+    public static File createTempFile(String fileName, String content) throws IOException {
+        String fullPath = System.getProperty("java.io.tmpdir") + File.separator + fileName;
+        File diffFile = new File(fullPath);
+        boolean isSuccessful = diffFile.createNewFile();
+        FileWriter fw = new FileWriter(diffFile.getAbsoluteFile());
+        BufferedWriter bw = new BufferedWriter(fw);
+        bw.write(content);
+        bw.close();
+        fw.close();
+        return diffFile;
     }
 }

@@ -4,6 +4,10 @@
           <f:radio name="scmType" title="git" value="git" checked="${instance.scmType == 'git' || instance.scmType == null}" />
           <f:radio name="scmType" title="svn" value="svn" checked="${instance.scmType == 'svn'}" />
   </f:entry>
+  <f:entry title="Differential revsion type" field="revisionType" description="Differential revsion type used in this job">
+    <f:radio name="revisionType" title="Diffusion" value="diffusion" checked="${instance.revisionType == 'diffusion' || instance.revisionType == null}" />
+    <f:radio name="revisionType" title="Non-Diffusion" value="non-diffusion" checked="${instance.revisionType == 'non-diffusion'}" />
+  </f:entry>
   <f:entry title="Create git commit" field="createCommit"
            description="Create a git commit with the patch">
       <f:checkbox />

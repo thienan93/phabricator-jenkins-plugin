@@ -90,6 +90,12 @@ public class DifferentialClient {
         }
     }
 
+    public String getRawDiff(String diffID) throws IOException, ConduitAPIException {
+        JSONObject params = new JSONObject().element("diffID", diffID);
+        JSONObject response = callConduit("differential.getrawdiff", params);
+        return response.getString("result");
+    }
+
     /**
      * Sets a sendHarbormasterMessage build status
      * @param phid Phabricator object ID

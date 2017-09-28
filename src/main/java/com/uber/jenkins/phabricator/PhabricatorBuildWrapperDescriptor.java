@@ -37,6 +37,8 @@ import org.kohsuke.stapler.StaplerRequest;
 public final class PhabricatorBuildWrapperDescriptor extends BuildWrapperDescriptor {
     private String credentialsID;
     private String arcPath;
+    private String gitPath;
+    private String svnPath;
 
     public PhabricatorBuildWrapperDescriptor() {
         super(PhabricatorBuildWrapper.class);
@@ -90,4 +92,20 @@ public final class PhabricatorBuildWrapperDescriptor extends BuildWrapperDescrip
     public void setArcPath(String arcPath) {
         this.arcPath = arcPath;
     }
+
+  public String getGitPath() {
+    return gitPath;
+  }
+
+  public void setGitPath(String gitPath) {
+    this.gitPath = gitPath;
+  }
+
+  public String getSvnPath() {
+    return svnPath;
+  }
+
+  public void setSvnPath(String svnPath) {
+    this.svnPath = svnPath;
+  }
 }

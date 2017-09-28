@@ -23,6 +23,7 @@ package com.uber.jenkins.phabricator;
 import hudson.EnvVars;
 import hudson.FilePath;
 import hudson.Launcher;
+import hudson.remoting.VirtualChannel;
 
 import java.io.PrintStream;
 
@@ -43,8 +44,13 @@ public class LauncherFactory {
         return this.stderr;
     }
 
+    public VirtualChannel getChannel() {
+        return launcher.getChannel();
+    }
+
     /**
      * Create a launcher
+     *
      * @return a launcher suitable for executing programs within Jenkins
      */
     public Launcher.ProcStarter launch() {

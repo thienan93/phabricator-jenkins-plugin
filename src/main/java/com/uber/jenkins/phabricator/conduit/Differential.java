@@ -81,8 +81,8 @@ public class Differential {
     public void decorate(AbstractBuild build, String phabricatorURL) {
         // Add a badge next to the build
         build.addAction(PhabricatorPostbuildAction.createShortText(
-                getRevisionID(true),
-                getPhabricatorLink(phabricatorURL)));
+            getRevisionID(true),
+            getPhabricatorLink(phabricatorURL)));
         // Add some long-form text
         PhabricatorPostbuildSummaryAction summary = createSummary(phabricatorURL);
         build.addAction(summary);
@@ -91,13 +91,13 @@ public class Differential {
 
     public PhabricatorPostbuildSummaryAction createSummary(String phabricatorURL) {
         return new PhabricatorPostbuildSummaryAction(
-                "phabricator.png",
-                getPhabricatorLink(phabricatorURL),
-                getDiffID(),
-                getRevisionID(true),
-                getAuthorName(),
-                getAuthorEmail(),
-                getCommitMessage()
+            "phabricator.png",
+            getPhabricatorLink(phabricatorURL),
+            getDiffID(),
+            getRevisionID(true),
+            getAuthorName(),
+            getAuthorEmail(),
+            getCommitMessage()
         );
     }
 
@@ -122,7 +122,8 @@ public class Differential {
      * @return the base revision for git
      */
     public String getBaseCommit() {
-        return (String) rawJSON.get("sourceControlBaseRevision");
+        JSONObject baseRevision = rawJSON.getJSONObject("sourceControlBaseRevision");
+        return baseRevision.isNullObject() ? "N/A" : baseRevision.toString();
     }
 
     /**
