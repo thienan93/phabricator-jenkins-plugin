@@ -164,11 +164,11 @@ public class ApplyPatchTask extends Task {
         File masterTmpFile = CommonUtils.createTempFile(String.valueOf(buildNumber) + "-" + UUID.randomUUID().toString() + ".diff", rawDiff);
         String tmpFilePathAbsolutePath = masterTmpFile.getAbsolutePath();
         logger.info(getTag(), tmpFilePathAbsolutePath);
-        FilePath salveTmpFile = new FilePath(starter.getChannel(), tmpFilePathAbsolutePath);
-        salveTmpFile.write(rawDiff, "UTF-8");
+        FilePath slaveTmpFile = new FilePath(starter.getChannel(), tmpFilePathAbsolutePath);
+        slaveTmpFile.write(rawDiff, "UTF-8");
         if ("git".equals(scmType)) {
             exitCode = starter.launch()
-                .cmds(Arrays.asList(svnPath, "apply", tmpFilePathAbsolutePath))
+                .cmds(Arrays.asList(gitPath, "apply", tmpFilePathAbsolutePath))
                 .join();
         } else {
             exitCode = starter.launch()
@@ -176,7 +176,7 @@ public class ApplyPatchTask extends Task {
                 .join();
         }
         masterTmpFile.delete();
-        salveTmpFile.delete();
+        slaveTmpFile.delete();
         return exitCode;
     }
 }
